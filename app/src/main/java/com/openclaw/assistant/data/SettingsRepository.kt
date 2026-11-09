@@ -11,12 +11,12 @@ import java.util.UUID
  */
 class SettingsRepository(private val appContext: Context) {
 
-    private val masterKey = MasterKey.Builder(context)
+    private val masterKey = MasterKey.Builder(appContext)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
     private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
-        context,
+        appContext,
         PREFS_NAME,
         masterKey,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
