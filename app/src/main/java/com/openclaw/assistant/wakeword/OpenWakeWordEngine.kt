@@ -2,49 +2,39 @@ package com.openclaw.assistant.wakeword
 
 import android.content.Context
 import com.openclaw.assistant.data.SettingsRepository
-import com.openwakeword.OpenWakeWord
 
 /**
- * App-level adapter that reads settings and delegates to the
- * [OpenWakeWord] library module.
+ * Точка входа движка wake-word для приложения.
+ *
+ * Изначально здесь был openWakeWord с зашитыми английскими словами
+ * (hey jarvis / alexa / hey mycroft). Для шлема нужен свой wake-word «мэй»,
+ * поэтому движок заменён на sherpa-onnx KWS (см. [SherpaKwsEngine]) —
+ * интерфейс [WakeWordEngine] остался тем же, остальной код сервиса не тронут.
  */
 class OpenWakeWordEngine(
     private val context: Context,
-    private val settings: SettingsRepository
+    @Suppress("UNUSED_PARAMETER") settings: SettingsRepository
 ) : WakeWordEngine {
 
-    private var detector: OpenWakeWord? = null
+    private var detector: WakeWordEngine = SherpaKwsEngine(context)
 
-    override fun isAvailable(): Boolean = true
+    override fun isAvailable(): Boolean = detector.isAvailable()
 
     override fun start(onDetected: () -> Unit) {
-        if (detector == null) {
-            val builder = OpenWakeWord.Builder(context)
-                .setThreshold(settings.wakeWordThreshold)
-
-            val model = presetToModel(settings.wakeWordPreset)
-            if (model != null) builder.setModel(model)
-
-            detector = builder.build()
-        }
-        detector?.start { onDetected() }
+        detector.start(onDetected)
     }
 
     override fun stop() {
-        detector?.stop()
+        detector.stop()
     }
 
     override fun release() {
-        detector?.release()
-        detector = null
+        detector.release()
     }
 
     companion object {
-        fun presetToModel(preset: String): OpenWakeWord.BuiltInModel? = when (preset) {
-            SettingsRepository.WAKE_WORD_HEY_JARVIS -> OpenWakeWord.BuiltInModel.HEY_JARVIS
-            SettingsRepository.WAKE_WORD_ALEXA -> OpenWakeWord.BuiltInModel.ALEXA
-            SettingsRepository.WAKE_WORD_HEY_MYCROFT -> OpenWakeWord.BuiltInModel.HEY_MYCROFT
-            else -> null
-        }
+        // Оставлено для совместимости: старые настройки ссылались на пресеты openWakeWord.
+        const val KWS_SCORE = 4.0f
+        const val KWS_THRESHOLD = 0.002f
     }
 }
