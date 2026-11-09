@@ -19,6 +19,10 @@ import com.openclaw.assistant.MainActivity
 import com.openclaw.assistant.R
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.openclaw.assistant.data.SettingsRepository
+import HelmAudio
+import ReplyFetcher
+import CommandRecorder
+import RelayUploader
 import com.openclaw.assistant.wakeword.OpenWakeWordEngine
 import com.openclaw.assistant.wakeword.WakeWordEngine
 import kotlinx.coroutines.*
@@ -175,25 +179,64 @@ class HotwordService : Service() {
         // доставка в чат. После отправки снова слушаем wake-word.
         scope.launch {
             engine?.stop()
-            delay(250)
+            delay(200)
 
+            // 1. Писк — знак, что запись пошла; заодно приглушаем чужое медиа
+            setState("● записываю — говори")
+            HelmAudio.beepStart()
+            HelmAudio.pauseMedia(this@HotwordService)
+            delay(150)
+
+            // 2. Пишем команду до тишины
             val pcm = withContext(Dispatchers.IO) {
-                com.openclaw.assistant.audio.CommandRecorder.record()
+                CommandRecorder.record()
             }
+
             if (pcm != null) {
+                setState("● отправила, жду ответ")
                 withContext(Dispatchers.IO) {
-                    com.openclaw.assistant.net.RelayUploader.upload(this@HotwordService, pcm)
+                    RelayUploader.upload(this@HotwordService, pcm)
                 }
+                // 3. Ждём голосовой ответ и играем его. Пока играет — не слушаем,
+                //    иначе микрофон ловит собственную озвучку.
+                setState("● отвечаю голосом")
+                awaitAndPlayReply()
+                HelmAudio.resumeMedia(this@HotwordService)
             } else {
+                HelmAudio.beepFail()
+                HelmAudio.resumeMedia(this@HotwordService)
                 Log.d(TAG, "команда не записана (тишина или слишком коротко)")
             }
 
+            setState("● слушаю «мэй»")
             cancelWatchdog()
             isSessionActive = false
             isListeningForCommand = false
-            delay(400)
+            delay(300)
             engine?.start { onHotwordDetected() }
         }
+    }
+
+    /**
+     * Опрос голосового ответа: до 90 секунд, шаг 1.5 с. Если ответа нет — молчим:
+     * расшифровка всё равно ушла в чат, и Саша увидит её там.
+     */
+    private suspend fun awaitAndPlayReply() {
+        val deadline = System.currentTimeMillis() + 90_000
+        while (System.currentTimeMillis() < deadline) {
+            delay(1500)
+            val file = withContext(Dispatchers.IO) {
+                ReplyFetcher.poll(this@HotwordService)
+            }
+            if (file != null) {
+                withContext(Dispatchers.IO) {
+                    HelmAudio.playFile(this@HotwordService, file)
+                    file.delete()
+                }
+                return
+            }
+        }
+        Log.d(TAG, "голосового ответа не дождалась")
     }
 
     private fun resumeHotwordDetection() {
@@ -230,14 +273,24 @@ class HotwordService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // IMPORTANCE_DEFAULT, а не LOW: в VR важна строка состояния, а не тишина.
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             )
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)
         }
+    }
+
+    @Volatile
+    private var stateText: String? = null
+
+    /** Текст состояния в шторке: «слушаю» → «пишу» → «отвечаю». */
+    private fun setState(text: String?) {
+        stateText = text
+        updateNotification()
     }
 
     private fun createNotification(): Notification {
@@ -247,7 +300,7 @@ class HotwordService : Service() {
         val wakeWordName = settings.getWakeWordDisplayName()
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
-            .setContentText(getString(R.string.notification_content, wakeWordName))
+            .setContentText(stateText ?: getString(R.string.notification_content, wakeWordName))
             .setSmallIcon(R.drawable.ic_mic)
             .setContentIntent(pendingIntent)
             .setOngoing(true)

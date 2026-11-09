@@ -45,11 +45,32 @@ object RelayUploader {
             client.newCall(request).execute().use { resp ->
                 val body = resp.body?.string().orEmpty()
                 Log.d(TAG, "upload ${resp.code}: ${body.take(300)}")
+                if (resp.isSuccessful) askForVoiceReply(context, url, token)
                 resp.isSuccessful
             }
         } catch (e: Exception) {
             Log.e(TAG, "upload failed", e)
             false
+        }
+    }
+
+    /**
+     * Просим сервер озвучить ответ в шлем. Шлём тот же URL, что и для распознавания —
+     * сервер сам знает, что делать; ответ придёт потом по опросу /reply.
+     */
+    private fun askForVoiceReply(context: Context, url: String, token: String) {
+        val sayUrl = url.substringBefore("/quest").trimEnd('/') + "/reply/say"
+        val request = Request.Builder()
+            .url(sayUrl)
+            .apply { if (token.isNotBlank()) header("X-Voice-Token", token) }
+            .post("{}".toRequestBody(jsonMedia))
+            .build()
+        try {
+            client.newCall(request).execute().use { r ->
+                Log.d(TAG, "ask reply ${r.code}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "ask reply failed: ${e.message}")
         }
     }
 }
