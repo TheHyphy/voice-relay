@@ -27,6 +27,10 @@ class HotwordService : Service() {
 
     companion object {
         private const val TAG = "HotwordService"
+
+        /** Сервис уже запущен — не поднимаем второй экземпляр. */
+        @Volatile var isRunning: Boolean = false
+            private set
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "hotword_channel"
         const val ACTION_RESUME_HOTWORD = "com.openclaw.assistant.ACTION_RESUME_HOTWORD"
@@ -116,6 +120,7 @@ class HotwordService : Service() {
             return START_NOT_STICKY
         }
 
+        isRunning = true
         initEngine()
         return START_STICKY
     }
@@ -140,6 +145,7 @@ class HotwordService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        isRunning = false
         cancelWatchdog()
         try { unregisterReceiver(controlReceiver) } catch (_: Exception) {}
         scope.cancel()

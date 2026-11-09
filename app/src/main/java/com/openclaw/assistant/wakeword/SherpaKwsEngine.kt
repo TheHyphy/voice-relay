@@ -39,42 +39,17 @@ class SherpaKwsEngine(
 
     @Volatile private var running = false
 
-    private fun modelsDir(): String {
-        // Файлы модели лежат в assets/kws/ и копируются в filesDir при первом запуске:
-        // sherpa-onnx на Android читает пути через AssetManager, но onnxruntime
-        // с asset-URI работает нестабильно — проще один раз распаковать.
-        val dir = java.io.File(context.filesDir, "kws")
-        if (!dir.exists()) {
-            dir.mkdirs()
-            copyAsset("kws", dir)
-        }
-        return dir.absolutePath
-    }
-
-    private fun copyAsset(assetPath: String, outDir: java.io.File) {
-        val am = context.assets
-        val children = am.list(assetPath) ?: return
-        for (name in children) {
-            val full = "$assetPath/$name"
-            val sub = am.list(full)
-            if (sub != null && sub.isNotEmpty()) {
-                val d = java.io.File(outDir, name)
-                d.mkdirs()
-                copyAsset(full, d)
-            } else {
-                java.io.File(outDir, name).outputStream().use { out ->
-                    am.open(full).use { it.copyTo(out) }
-                }
-            }
-        }
-    }
+    // sherpa-onnx читает модель прямо из assets, если путь относительный:
+    // абсолютный путь при установленном AssetManager библиотека отвергает
+    // («assetManager is NOT set to null» → Load failed). Поэтому распаковка не нужна.
+    private val modelDir = "kws"
 
     override fun isAvailable(): Boolean = true
 
     @Synchronized
     override fun start(onDetected: () -> Unit) {
         if (running) return
-        val dir = modelsDir()
+        val dir = modelDir
 
         val config = KeywordSpotterConfig(
             featConfig = FeatureConfig(sampleRate = SAMPLE_RATE, featureDim = 80),

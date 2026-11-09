@@ -273,6 +273,22 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    /**
+     * Автозапуск прослушивания при открытии приложения (шлем, запуск по adb).
+     */
+    private fun maybeAutoStartListening() {
+        val settings = SettingsRepository.getInstance(this)
+        val cfg = com.openclaw.assistant.data.RelayConfig.load(this) ?: return
+        if (!cfg.optBoolean("listen", false)) return
+        if (!settings.isConfigured()) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED) return
+        if (HotwordService.isRunning) return
+        settings.hotwordEnabled = true
+        HotwordService.start(this)
+        android.util.Log.d("MainActivity", "автозапуск прослушивания по relay.json")
+    }
+
     private fun showPermissionRationaleDialog() {
         android.app.AlertDialog.Builder(this)
             .setTitle(getString(R.string.mic_permission_rationale_title))
@@ -320,6 +336,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         super.onResume()
         refreshMissingPermissions()
         refreshAllPermissionsStatus()
+
+        // Шлем: приложение открывают редко, а слушать надо постоянно. Если
+        // внешний конфиг (files/relay.json) просит слушать — поднимаем сервис
+        // отсюда, из видимой активности: Android 14 разрешает микрофон
+        // foreground-сервису только при запуске «пока приложение на экране».
+        maybeAutoStartListening()
 
         // Detect app language change made in SettingsActivity and recreate to apply it.
         // attachBaseContext() ensures the new instance always gets the correct locale,

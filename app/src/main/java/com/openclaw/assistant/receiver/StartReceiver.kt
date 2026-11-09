@@ -28,8 +28,14 @@ class StartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_START -> {
-                Log.d(TAG, "start requested")
-                HotwordService.start(context)
+                // Сервис с микрофоном нельзя стартовать из фона (Android 14:
+                // «while-in-use»), поэтому поднимаем активность — она сама
+                // запустит прослушивание из видимого состояния.
+                Log.d(TAG, "start requested — открываю активность")
+                val activity = Intent(context, com.openclaw.assistant.MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+                context.startActivity(activity)
             }
             ACTION_STOP -> {
                 Log.d(TAG, "stop requested")
