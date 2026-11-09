@@ -19,10 +19,10 @@ import com.openclaw.assistant.MainActivity
 import com.openclaw.assistant.R
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.openclaw.assistant.data.SettingsRepository
-import HelmAudio
-import ReplyFetcher
-import CommandRecorder
-import RelayUploader
+import com.openclaw.assistant.audio.CommandRecorder
+import com.openclaw.assistant.audio.HelmAudio
+import com.openclaw.assistant.net.RelayUploader
+import com.openclaw.assistant.net.ReplyFetcher
 import com.openclaw.assistant.wakeword.OpenWakeWordEngine
 import com.openclaw.assistant.wakeword.WakeWordEngine
 import kotlinx.coroutines.*

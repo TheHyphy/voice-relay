@@ -27,6 +27,7 @@ object RelayUploader {
         .build()
 
     private val pcm = "application/octet-stream".toMediaType()
+    private val jsonMedia = "application/json".toMediaType()
 
     fun upload(context: Context, samples: ByteArray): Boolean {
         val settings = SettingsRepository.getInstance(context)
