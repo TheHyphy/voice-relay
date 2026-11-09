@@ -9,7 +9,7 @@ import java.util.UUID
 /**
  * Secure settings storage
  */
-class SettingsRepository(context: Context) {
+class SettingsRepository(private val appContext: Context) {
 
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -25,7 +25,9 @@ class SettingsRepository(context: Context) {
 
     // HTTP Server URL (required)
     var httpUrl: String
-        get() = prefs.getString(KEY_HTTP_URL, "") ?: ""
+        // Внешний конфиг (files/relay.json) главнее: на шлеме его кладут по adb,
+        // потому что зашифрованные prefs снаружи не записать.
+        get() = RelayConfig.url(appContext) ?: (prefs.getString(KEY_HTTP_URL, "") ?: "")
         set(value) {
             if (value != httpUrl) {
                 prefs.edit().putString(KEY_HTTP_URL, value).apply()
@@ -35,7 +37,7 @@ class SettingsRepository(context: Context) {
 
     // Auth Token (optional)
     var authToken: String
-        get() = prefs.getString(KEY_AUTH_TOKEN, "") ?: ""
+        get() = RelayConfig.token(appContext).ifBlank { prefs.getString(KEY_AUTH_TOKEN, "") ?: "" }
         set(value) = prefs.edit().putString(KEY_AUTH_TOKEN, value).apply()
 
     // Session ID (auto-generated)
@@ -298,6 +300,7 @@ class SettingsRepository(context: Context) {
 
     // Check if configured
     fun isConfigured(): Boolean {
+        if (RelayConfig.url(appContext) != null) return true   // конфиг задан снаружи
         return when (connectionType) {
             CONNECTION_TYPE_GATEWAY -> true
             else -> httpUrl.isNotBlank() && isVerified

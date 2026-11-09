@@ -162,16 +162,31 @@ class HotwordService : Service() {
         isSessionActive = true
         startWatchdog()
 
-        Log.d(TAG, "Hotword Detected! Triggering Assistant Overlay...")
+        Log.d(TAG, "Hotword detected — записываю команду и отправляю на сервер")
 
+        // Шлем: вместо локального ассистента (на Horizon OS нет ни STT-движка,
+        // ни TTS) записываем сказанное и отдаём на сервер — там распознавание и
+        // доставка в чат. После отправки снова слушаем wake-word.
         scope.launch {
             engine?.stop()
-            delay(300)
+            delay(250)
 
-            val intent = Intent(this@HotwordService, OpenClawAssistantService::class.java).apply {
-                action = OpenClawAssistantService.ACTION_SHOW_ASSISTANT
+            val pcm = withContext(Dispatchers.IO) {
+                com.openclaw.assistant.audio.CommandRecorder.record()
             }
-            startService(intent)
+            if (pcm != null) {
+                withContext(Dispatchers.IO) {
+                    com.openclaw.assistant.net.RelayUploader.upload(this@HotwordService, pcm)
+                }
+            } else {
+                Log.d(TAG, "команда не записана (тишина или слишком коротко)")
+            }
+
+            cancelWatchdog()
+            isSessionActive = false
+            isListeningForCommand = false
+            delay(400)
+            engine?.start { onHotwordDetected() }
         }
     }
 

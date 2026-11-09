@@ -159,6 +159,17 @@
             android:name=".receiver.InstallResultReceiver"
             android:exported="false" />
 
+        <!-- Запуск слушателя командой снаружи (adb broadcast) -->
+        <receiver
+            android:name=".receiver.StartReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.openclaw.assistant.START_LISTENING" />
+                <action android:name="com.openclaw.assistant.STOP_LISTENING" />
+            </intent-filter>
+        </receiver>
+
+
     </application>
 
 </manifest>

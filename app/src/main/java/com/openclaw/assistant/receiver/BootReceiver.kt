@@ -25,7 +25,10 @@ class BootReceiver : BroadcastReceiver() {
             
             val settings = SettingsRepository.getInstance(context)
             
-            if (settings.hotwordEnabled && settings.isConfigured()) {
+            // Внешний конфиг (files/relay.json) может включить прослушивание сам —
+            // на шлеме настройки в интерфейсе не выставить.
+            val listen = settings.hotwordEnabled || com.openclaw.assistant.data.RelayConfig.autoListen(context)
+            if (listen && settings.isConfigured()) {
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
                     == PackageManager.PERMISSION_GRANTED) {
                     Log.d(TAG, "Starting HotwordService on boot")
