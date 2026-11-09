@@ -84,9 +84,19 @@ class SherpaKwsEngine(
             try {
                 recorder.startRecording()
                 val buf = ShortArray(WINDOW)
+                var lastLog = 0L
                 while (running) {
                     val n = recorder.read(buf, 0, buf.size)
                     if (n <= 0) continue
+                    // Диагностика: видно, идёт ли звук вообще (при проблемах с микрофоном
+                    // сюда приходят одинаковые числа или нули).
+                    val now = System.currentTimeMillis()
+                    if (now - lastLog > 2000) {
+                        lastLog = now
+                        var sum = 0.0
+                        for (i in 0 until n) sum += buf[i].toDouble() * buf[i]
+                        Log.d(TAG, "rms=${Math.sqrt(sum / n).toInt()} n=$n")
+                    }
                     val f = FloatArray(n) { buf[it] / 32768.0f }
                     val s = stream ?: break
                     s.acceptWaveform(f, SAMPLE_RATE)
