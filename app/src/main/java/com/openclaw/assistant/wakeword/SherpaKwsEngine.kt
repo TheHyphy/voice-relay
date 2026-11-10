@@ -88,14 +88,15 @@ class SherpaKwsEngine(
                 while (running) {
                     val n = recorder.read(buf, 0, buf.size)
                     if (n <= 0) continue
-                    // Диагностика: видно, идёт ли звук вообще (при проблемах с микрофоном
-                    // сюда приходят одинаковые числа или нули).
+                    // Диагностика: видно, идёт ли звук вообще. Пишем только пики —
+                    // тишина даёт rms 0, и лог не нужен.
                     val now = System.currentTimeMillis()
                     if (now - lastLog > 2000) {
                         lastLog = now
                         var sum = 0.0
                         for (i in 0 until n) sum += buf[i].toDouble() * buf[i]
-                        Log.d(TAG, "rms=${Math.sqrt(sum / n).toInt()} n=$n")
+                        val rms = Math.sqrt(sum / n).toInt()
+                        if (rms > 20) Log.d(TAG, "peak rms=$rms n=$n")
                     }
                     val f = FloatArray(n) { buf[it] / 32768.0f }
                     val s = stream ?: break
